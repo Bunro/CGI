@@ -4,19 +4,34 @@
 #version 330
 
 in vec4 position;
-
-
+out vec3 normal;
 
 uniform mat4 mvp;
+out vec2 frag_pos;
 
 //Returns the height of the procedural terrain at a given xz position
 float getTerrainHeight(vec2 p);
 
-
-
 void main()
 {
-	gl_Position = mvp * position;
+    /*Start 2.2.2a*/
+	vec4 newPosition =vec4(position.x, getTerrainHeight(position.xz), position.z, 1);
+	gl_Position = mvp * newPosition;
+	frag_pos = position.xz;
+	/*End 2.2.2a*/
+
+  /*Start 2.2.2b*/
+   vec3 dz = vec3(0, getTerrainHeight(vec2(position.x, (position.z)+1)) - getTerrainHeight(vec2(position.x, (position.z)-1)), 2);
+   vec3 dx = vec3(2, getTerrainHeight(vec2((position.x)+0.1, position.z)) - getTerrainHeight(vec2((position.x)-0.1, position.z)), 0);
+
+	vec3 dx1;
+	vec3 dz1;
+	dx1 = normalize(dx);
+	dz1 = normalize(dz);
+
+	normal = cross(dz1, dx1);
+	/*End 2.2.2b*/
+  
 }
 
 //source: https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83

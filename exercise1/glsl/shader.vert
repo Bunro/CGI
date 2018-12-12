@@ -4,16 +4,19 @@
 #version 130
 
 in vec4 in_position;
+in vec4 in_color;
+
+uniform mat4 modelView;
+uniform mat4 projection;
 
 out vec4 fragment_color;
-
-
-
+out vec4 point_position;
 
 void main(void)
-{
-	gl_Position = in_position;
-	fragment_color = in_position;
+{   
+    point_position = in_position;
+	gl_Position = projection*modelView*in_position;
+	fragment_color = in_color;
 
 	/* - 1.2.2 (b)
 	 * Declare a new "in" variable with the name "in_color". Instead of setting

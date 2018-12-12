@@ -67,7 +67,20 @@ GLuint CreateTexture(const unsigned char* fileData, size_t fileLength, bool repe
 	int textureWidth, textureHeight, textureChannels;
 	auto pixelData = stbi_load_from_memory(fileData, fileLength, &textureWidth, &textureHeight, &textureChannels, 3);
 	textureName = 0;
+
+	/*Start 2.2.3a + in drawContents*/
+	glGenTextures(1, &textureName);
+	glBindTexture(GL_TEXTURE_2D, textureName);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureWidth, textureHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelData);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	/*End 2.2.3a*/
+
 	stbi_image_free(pixelData);
+
 	return textureName;
 }
 
@@ -82,9 +95,28 @@ void Viewer::CreateGeometry()
 	
 	std::vector<Eigen::Vector4f> positions;
 	std::vector<uint32_t> indices;
+
 	
-	/*Generate positions and indices for a terrain patch with a
-	  single triangle strip */
+	/*2.2.1a Generate positions and indices for a terrain patch with a
+	  single triangle strip */
+	for (int z = 0; z <= PATCH_SIZE; z++) {
+		for (int x = 0; x <= PATCH_SIZE; x++) {
+			positions.push_back(Eigen::Vector4f(x, 0, z, 1));
+		}
+	}
+	
+	for (int z = 0; z < PATCH_SIZE; z++)
+	{
+		for (int x = 0; x <= PATCH_SIZE; x++)
+		{
+			indices.push_back(z*(PATCH_SIZE + 1) + x);
+			indices.push_back((z + 1)*(PATCH_SIZE + 1) + x);
+		}
+		indices.push_back(PATCH_SIZE*PATCH_SIZE);
+	}
+
+
+	/* End 2.2.1a*/
 
 	terrainShader.bind();
 	terrainPositions.uploadData(positions).bindToAttribute("position");
@@ -174,8 +206,44 @@ void Viewer::drawContents()
 	terrainShader.setUniform("screenSize", Eigen::Vector2f(width(), height()), false);
 	terrainShader.setUniform("mvp", mvp);
 	terrainShader.setUniform("cameraPos", cameraPosition, false);
+	
 
-	/* Task: Render the terrain */
+	/*Start 2.2.3a*/
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, grassTexture);
+	terrainShader.setUniform("grassTexture", 0);
+	/*End 2.2.3a*/
+
+	/*Start 2.2.4a*/
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, rockTexture);
+	terrainShader.setUniform("rockTexture", 1);
+	/*End 2.2.4a*/
+
+	/*Start 2.2.4b*/
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, roadColorTexture);
+	terrainShader.setUniform("roadColorTexture", 2);
+
+
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, alphaMap);
+	terrainShader.setUniform("alphaMap", 3);
+	/*End 2.2.4b*/
+
+	/*Start 2.2.4c*/
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, roadSpecularMap);
+	terrainShader.setUniform("roadSpecularMap", 4);
+	/*End 2.2.4c*/
+
+	/* 2.2.1b Task: Render the terrain */
+	glEnable(GL_PRIMITIVE_RESTART);
+	glPrimitiveRestartIndex(PATCH_SIZE*PATCH_SIZE);
+	glDrawElements(GL_TRIANGLE_STRIP, terrainIndices.bufferSize(), GL_UNSIGNED_INT, 0);
+	glDisable(GL_PRIMITIVE_RESTART);
+	//glDrawElements(GL_TRIANGLES, terrainIndices.bufferSize(), GL_UNSIGNED_INT, 0);
+	/* End 2.2.1b*/
 
 	
 	//Render text

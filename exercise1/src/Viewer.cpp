@@ -16,7 +16,7 @@
 
 Viewer::Viewer()
 	: AbstractViewer("CG1 Exercise 1")
-{ 
+{
 	SetupGUI();
 
 	CreateShaders();
@@ -39,6 +39,9 @@ void Viewer::SetupGUI()
 	chkHasFaceCulling = new nanogui::CheckBox(mainWindow, "Perform backface Culling");
 	chkHasFaceCulling->setChecked(true);
 
+	isJulia = new nanogui::CheckBox(mainWindow, "Julia < - > Mandelbrot");
+	isJulia->setChecked(true);
+
 	sldJuliaCX = nse::gui::AddLabeledSliderWithDefaultDisplay(mainWindow, "JuliaC.X", std::make_pair(-1.0f, 1.0f), 0.45f, 2);
 	sldJuliaCY = nse::gui::AddLabeledSliderWithDefaultDisplay(mainWindow, "JuliaC.Y", std::make_pair(-1.0f, 1.0f), -0.3f, 2);
 	sldJuliaZoom = nse::gui::AddLabeledSliderWithDefaultDisplay(mainWindow, "Julia Zoom", std::make_pair(0.01f, 10.0f), 1.0f, 2);
@@ -55,14 +58,23 @@ void Viewer::CreateVertexBuffers()
 
 	// Define 3 vertices for one face
 	GLfloat positions[] = {
-		0, 1, 0, 1,
-		-1, -1, 0, 1,
-		1, -1, 0, 1
+		1, -1, -1, 1,
+		-1, 1, -1, 1,
+		1, 1, 1, 1,
+
+		1, 1, 1, 1,
+		-1, -1, 1, 1,
+		1, -1, -1, 1,
+
+		1, -1, -1, 1,
+		-1, -1, 1, 1,
+		-1, 1, -1, 1,
+
+		-1, 1, -1, 1,
+		-1, -1, 1, 1,
+		1, 1, 1, 1,
 	};
 
-	
-
-	
 
 	// Generate the vertex array 
 	glGenVertexArrays(1, &vertex_array_id);
@@ -78,7 +90,7 @@ void Viewer::CreateVertexBuffers()
 	// "in_position". First, get the location of this attribute in 
 	// the shader program
 	GLuint vid = glGetAttribLocation(program_id, "in_position");
-	
+
 	// Enable this vertex attribute array
 	glEnableVertexAttribArray(vid);
 	// Set the format of the data to match the type of "in_position"
@@ -88,12 +100,44 @@ void Viewer::CreateVertexBuffers()
 	Create another buffer that will store color information. This works nearly
 	similar to the code above that creates the position buffer. Store the buffer
 	id into the variable "color_buffer_id" and bind the color buffer to the
-	shader variable "in_color".
+	shader variable "in_color".*/
+	GLfloat colors[] = {
+		1, 0, 0, 1,
+		1, 0, 0, 1,
+		1, 0, 0, 1,
 
+		0, 1, 0, 1,
+		0, 1, 0, 1,
+		0, 1, 0, 1,
+
+		0, 0, 1, 1,
+		0, 0, 1, 1,
+		0, 0, 1, 1,
+
+		1, 1, 1, 1,
+		1, 1, 1, 1,
+		1, 1, 1, 1,
+	};
+
+	// Generate a color buffer to be appended to the vertex array
+	glGenBuffers(1, &color_buffer_id);
+	// Bind the buffer for subsequent settings
+	glBindBuffer(GL_ARRAY_BUFFER, color_buffer_id);
+	// Supply the position data
+	glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+	// The buffer shall now be linked to the shader attribute
+	// "in_color". First, get the location of this attribute in
+	// the shader program
+	GLuint cid = glGetAttribLocation(program_id, "in_color");
+
+	// Enable this vertex attribute array
+	glEnableVertexAttribArray(cid);
+	// Set the format of the data to match the type of "in_color"
+	glVertexAttribPointer(cid, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
 	/*** End of task 1.2.2 (a) ***/
-	
-	
+
+
 
 	// Unbind the vertex array to leave OpenGL in a clean state
 	glBindVertexArray(0);
@@ -136,6 +180,34 @@ void Viewer::CreateShaders()
 	attach both shader objects and link them. For error checking, you can
 	use the method "CheckShaderCompileStatus()" after the call to glCompileShader().
 	*/
+
+	// Create an empty vertex shader handle
+	GLuint vertex_shader_id = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertex_shader_id, 1, &vertex_content, 0);
+	// Compile the vertex shader
+	glCompileShader(vertex_shader_id);
+
+	CheckShaderCompileStatus(vertex_shader_id, "Vertex Shader");
+
+	// Create an empty fragment shader handle
+	GLuint fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragment_shader_id, 1, &fragment_content, 0);
+	// Compile the fragment shader
+	glCompileShader(fragment_shader_id);
+
+	CheckShaderCompileStatus(fragment_shader_id, "Fragment Shader");
+
+	// Vertex and fragment shaders are successfully compiled.
+	// Now time to link them together into a program.
+	// Get a program object.
+	program_id = glCreateProgram();
+
+	// Attach our shaders to our program
+	glAttachShader(program_id, vertex_shader_id);
+	glAttachShader(program_id, fragment_shader_id);
+
+	// Link our program
+	glLinkProgram(program_id);
 	/*** End of task 1.2.1 ***/
 }
 
@@ -167,18 +239,42 @@ void Viewer::drawContents()
 	/*** Begin of task 1.2.4 (b) ***
 	Set the shader variables for the modelview and projection matrix.
 	First, find the location of these variables using glGetUniformLocation and
-	then set them with the command glUniformMatrix4fv. 
+	then set them with the command glUniformMatrix4fv.
 	*/
+	GLint modelViewId = glGetUniformLocation(program_id, "modelView");
+	GLint projectionId = glGetUniformLocation(program_id, "projection");
+
+	glUniformMatrix4fv(modelViewId, 1, GL_FALSE, modelViewMatrix.data());
+	glUniformMatrix4fv(projectionId, 1, GL_FALSE, projectionMatrix.data());
+
+	/*** End of task 1.2.4 (b) ***/
+
+	/*** Bonus 1 ***/
+	GLint mId = glGetUniformLocation(program_id, "m");
+	glUniform1f(mId, juliaZoom);
+
+	GLint cId = glGetUniformLocation(program_id, "c");
+	glUniform2fv(cId, 1, juliaC.data());
+
+	/*** End of Bonus 1 ***/
+
+	/*** Bonus 3 ***/
+	GLint jId = glGetUniformLocation(program_id, "julia");
+	glUniform1i(jId, isJulia->checked());
+
+	/*** End of Bonus 3 ***/
+
 
 	// Bind the vertex array 
 	glBindVertexArray(vertex_array_id);
 	// Draw the bound vertex array. Start at element 0 and draw 3 vertices
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDrawArrays(GL_TRIANGLES, 0, 12);
 
-	/*** End of task 1.2.4 (b) ***/
-	
+
 	// Unbind the vertex array
 	glBindVertexArray(0);
 	// Deactivate the shader program
 	glUseProgram(0);
+
 }
+
